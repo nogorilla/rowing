@@ -10,12 +10,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// type Rowing struct {
-// 	date     time.Time
-// 	distance int64
-// 	pace     int64
-// }
-
 func calcLength(ts string) {
 	t1, err := time.Parse("15:04:05", ts)
 	t2, err := time.Parse("15:04:05", "00:00:00")
@@ -48,8 +42,10 @@ func fileExists() bool {
 func main() {
 	var date string
 	var distance int64
+	var power int64
 	var length string
 	var pace string
+	var note string
 
 	app := &cli.App{
 		Name:  "rowing",
@@ -64,7 +60,7 @@ func main() {
 			},
 			&cli.Int64Flag{
 				Name:        "distance",
-				Usage:       "Distance travelled",
+				Usage:       "Distance traveled",
 				Required:    true,
 				Aliases:     []string{"d"},
 				Destination: &distance,
@@ -82,6 +78,22 @@ func main() {
 				Aliases:     []string{"l"},
 				Required:    true,
 				Destination: &length,
+			},
+			&cli.Int64Flag{
+				Name:        "power",
+				Usage:       "Power setting on rower",
+				Aliases:     []string{"w"},
+				Required:    false,
+				Destination: &power,
+				Value:       4,
+			},
+			&cli.StringFlag{
+				Name:        "note",
+				Usage:       "Note for rowing event",
+				Aliases:     []string{"n"},
+				Required:    false,
+				Destination: &note,
+				Value:       "",
 			},
 		},
 		Action: func(c *cli.Context) error {
