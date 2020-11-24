@@ -1,42 +1,51 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"os/user"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
 )
 
-func calcLength(ts string) {
-	t1, err := time.Parse("15:04:05", ts)
-	t2, err := time.Parse("15:04:05", "00:00:00")
+func duration(t string, format string, base string) float64 {
+	duration, _ := time.Parse(format, t)
+	zero, _ := time.Parse(format, base)
 
-	fmt.Println(err, t1.Sub(t2))
-	fmt.Println("hour", t1.Hour())
-	fmt.Println("minute", t1.Minute())
-	fmt.Println("second", t1.Second())
-}
+	result, _ := time.ParseDuration(duration.Sub(zero).String())
 
-func calcPace(pace string) {
-	paceTime, err := time.Parse("4:05.0", pace)
-	zeroTime, err := time.Parse("4:05.0", "0:00.0")
-	fmt.Println(err, paceTime.Sub(zeroTime))
-
-	fmt.Println("hour", paceTime.Hour())
-	fmt.Println("minute", paceTime.Minute())
-	fmt.Println("second", paceTime.Second())
+	return result.Seconds()
 }
 
 func fileExists() bool {
-	userprofile := os.Getenv("USERPROFILE")
-	info, err := os.Stat(path.Join(userprofile, "rowing.json"))
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+	info, err := os.Stat(path.Join(usr.HomeDir, "rowing.json"))
 	if os.IsNotExist(err) {
 		return false
 	}
 	return !info.IsDir()
+}
+
+type Events struct {
+	Events []Row `json:"events"`
+}
+
+type Row struct {
+	Date     string  `json:"date"`
+	Distance int     `json:"distance"`
+	Duration float64 `json:"duration"`
+	Pace     float64 `json:"pace"`
+	Power    int     `json:"power"`
+	Notes    string  `json:"notes"`
 }
 
 func main() {
@@ -45,7 +54,8 @@ func main() {
 	var power int64
 	var length string
 	var pace string
-	var note string
+	// var note string
+	// power, notes := 4, ""
 
 	app := &cli.App{
 		Name:  "rowing",
@@ -87,29 +97,57 @@ func main() {
 				Destination: &power,
 				Value:       4,
 			},
-			&cli.StringFlag{
-				Name:        "note",
-				Usage:       "Note for rowing event",
-				Aliases:     []string{"n"},
-				Required:    false,
-				Destination: &note,
-				Value:       "",
-			},
+			// &cli.StringFlag{
+			// 	Name:        "note",
+			// 	Usage:       "Note for rowing event",
+			// 	Aliases:     []string{"n"},
+			// 	Required:    false,
+			// 	Destination: &note,
+			// 	Value:       "",
+			// },
 		},
 		Action: func(c *cli.Context) error {
-			// look for existing rowing.json file
-			// if not create a new one
-
 			// add entry to bottom of the file
 			fmt.Printf("Distance: %x, Pace: %s, Date: %s\n", distance, pace, date)
 
-			calcLength(length)
-			calcPace(pace)
+			timeFmt := "04:05"
+			zeroFmt := "00:00"
 
-			if fileExists() {
-				fmt.Printf("file exist\n")
-			} else {
-				fmt.Printf("file doesn't exist exists\n")
+			if strings.Count(length, ":") > 1 {
+				timeFmt = "15:04:05"
+				zeroFmt = "00:00:00"
+			}
+
+			lSec := duration(length, timeFmt, zeroFmt)
+			pSec := duration(pace, "4:05.0", "0:00.0")
+
+			fmt.Println("duration: lSec:", lSec)
+			fmt.Println("duration: pSec:", pSec)
+
+			// if fileExists() {
+			// 	fmt.Printf("file exist\n")
+			// } else {
+			// 	fmt.Printf("file doesn't exist exists\n")
+			// }
+
+			// r := Row{date, distance, lSec, pSec, power, notes}
+			// fmt.Println(r)
+			// b, _ := json.Marshal(r)
+			// fmt.Println(string(b))
+
+			usr, err := user.Current()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			jsonFile, _ := os.Open(path.Join(usr.HomeDir, "rowing-new.json"))
+			defer jsonFile.Close()
+			byteValue, _ := ioutil.ReadAll(jsonFile)
+			var events []Row
+			json.Unmarshal(byteValue, &events)
+
+			for i := 0; i < len(events); i++ {
+				fmt.Printf("distance: %d, duration: %.0f, pace: %.1f\n", events[i].Distance, events[i].Duration, events[i].Pace)
 			}
 
 			return nil
