@@ -14,7 +14,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func duration(t string, format string, base string) float64 {
+func toSeconds(t string, format string, base string) float64 {
 	duration, _ := time.Parse(format, t)
 	zero, _ := time.Parse(format, base)
 
@@ -50,12 +50,11 @@ type Row struct {
 
 func main() {
 	var date string
-	var distance int64
-	var power int64
-	var length string
+	var distance int
+	var power int
+	var duration string
 	var pace string
-	// var note string
-	// power, notes := 4, ""
+	power, notes := 4, ""
 
 	app := &cli.App{
 		Name:  "rowing",
@@ -65,10 +64,10 @@ func main() {
 				Name:        "date",
 				Usage:       "Date of the exercise",
 				Aliases:     []string{"t"},
-				Value:       time.Now().UTC().Format("2006-01-02"),
+				Value:       time.Now().UTC().Format("2006-01-02T00:00:00Z"),
 				Destination: &date,
 			},
-			&cli.Int64Flag{
+			&cli.IntFlag{
 				Name:        "distance",
 				Usage:       "Distance traveled",
 				Required:    true,
@@ -83,13 +82,13 @@ func main() {
 				Destination: &pace,
 			},
 			&cli.StringFlag{
-				Name:        "length",
+				Name:        "duration",
 				Usage:       "Time spent rowing",
 				Aliases:     []string{"l"},
 				Required:    true,
-				Destination: &length,
+				Destination: &duration,
 			},
-			&cli.Int64Flag{
+			&cli.IntFlag{
 				Name:        "power",
 				Usage:       "Power setting on rower",
 				Aliases:     []string{"w"},
@@ -97,14 +96,14 @@ func main() {
 				Destination: &power,
 				Value:       4,
 			},
-			// &cli.StringFlag{
-			// 	Name:        "note",
-			// 	Usage:       "Note for rowing event",
-			// 	Aliases:     []string{"n"},
-			// 	Required:    false,
-			// 	Destination: &note,
-			// 	Value:       "",
-			// },
+			&cli.StringFlag{
+				Name:        "notes",
+				Usage:       "Notes for rowing event",
+				Aliases:     []string{"n"},
+				Required:    false,
+				Destination: &notes,
+				Value:       "",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// add entry to bottom of the file
@@ -113,27 +112,16 @@ func main() {
 			timeFmt := "04:05"
 			zeroFmt := "00:00"
 
-			if strings.Count(length, ":") > 1 {
+			if strings.Count(duration, ":") > 1 {
 				timeFmt = "15:04:05"
 				zeroFmt = "00:00:00"
 			}
 
-			lSec := duration(length, timeFmt, zeroFmt)
-			pSec := duration(pace, "4:05.0", "0:00.0")
+			dSec := toSeconds(duration, timeFmt, zeroFmt)
+			pSec := toSeconds(pace, "4:05.0", "0:00.0")
 
-			fmt.Println("duration: lSec:", lSec)
+			fmt.Println("duration: lSec:", dSec)
 			fmt.Println("duration: pSec:", pSec)
-
-			// if fileExists() {
-			// 	fmt.Printf("file exist\n")
-			// } else {
-			// 	fmt.Printf("file doesn't exist exists\n")
-			// }
-
-			// r := Row{date, distance, lSec, pSec, power, notes}
-			// fmt.Println(r)
-			// b, _ := json.Marshal(r)
-			// fmt.Println(string(b))
 
 			usr, err := user.Current()
 			if err != nil {
@@ -143,12 +131,30 @@ func main() {
 			jsonFile, _ := os.Open(path.Join(usr.HomeDir, "rowing-new.json"))
 			defer jsonFile.Close()
 			byteValue, _ := ioutil.ReadAll(jsonFile)
+
 			var events []Row
 			json.Unmarshal(byteValue, &events)
 
-			for i := 0; i < len(events); i++ {
-				fmt.Printf("distance: %d, duration: %.0f, pace: %.1f\n", events[i].Distance, events[i].Duration, events[i].Pace)
+			event := Row{
+				Date:     date,
+				Distance: distance,
+				Duration: dSec,
+				Pace:     pSec,
+				Power:    power,
+				Notes:    notes,
 			}
+
+			events = append(events, event)
+
+			// fmt.Println(event)
+			// t, _ := time.Parse("2006-01-02", date)
+			// fmt.Println(t)
+			// for i := 0; i < len(events); i++ {
+			// 	fmt.Printf("date: %s, distance: %d, duration: %.0f, pace: %.1f\n", events[i].Date, events[i].Distance, events[i].Duration, events[i].Pace)
+			// }
+
+			file, _ := json.MarshalIndent(events, "", " ")
+			_ = ioutil.WriteFile(path.Join(usr.HomeDir, "rowing-new.json"), file, 0644)
 
 			return nil
 		},

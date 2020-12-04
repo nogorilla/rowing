@@ -36,12 +36,38 @@ type Row struct {
 }
 
 type RowNew struct {
-	Date     string  `json:"date"`
-	Distance int     `json:"distance"`
-	Duration float64 `json:"duration"`
-	Pace     float64 `json:"pace"`
-	Power    int     `json:"power"`
-	Notes    string  `json:"notes"`
+	Date     time.Time `json:"date"`
+	Distance int       `json:"distance"`
+	Duration float64   `json:"duration"`
+	Pace     float64   `json:"pace"`
+	Power    int       `json:"power"`
+	Notes    string    `json:"notes"`
+}
+
+const (
+	t1 = "01/02/2006"
+	t2 = "1/02/2006"
+	t3 = "01/2/2006"
+	t4 = "1/1/2006"
+)
+
+func formatDate(d string) time.Time {
+	var date time.Time
+	var err error
+	date, err = time.Parse(t1, d)
+	if err != nil {
+		date, err = time.Parse(t2, d)
+
+		if err != nil {
+			date, err = time.Parse(t3, d)
+
+			if err != nil {
+				date, err = time.Parse(t4, d)
+			}
+		}
+	}
+
+	return date
 }
 
 func main() {
@@ -63,7 +89,8 @@ func main() {
 	var eventsNew []RowNew
 
 	for i := 0; i < len(events); i++ {
-		date := events[i].Date
+		date := formatDate(events[i].Date)
+		// fmt.Println(date)
 		distance, _ := strconv.Atoi(strings.Replace(events[i].Distance, ",", "", -1))
 		d := events[i].Duration
 		p := events[i].Pace
@@ -83,7 +110,7 @@ func main() {
 		} else {
 			pSec = 0.0
 		}
-		fmt.Println(pSec)
+		// fmt.Println(pSec)
 		// fmt.Printf("duration: %s, dSecs: %f, timefmt: %s, zeroFmt: %s\n", d, dSec, timeFmt, zeroFmt)
 		// fmt.Printf("date: %s, distance: %d, length: %.0f, pace: %.1f\n", events[i].Date, distance, dSec, pSec)
 		r := RowNew{date, distance, dSec, pSec, power, notes}
