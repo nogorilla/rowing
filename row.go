@@ -1,16 +1,15 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
-	"path"
 	"strings"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/urfave/cli/v2"
 )
 
@@ -23,16 +22,30 @@ func toSeconds(t string, format string, base string) float64 {
 	return result.Seconds()
 }
 
-func fileExists() bool {
-	usr, err := user.Current()
+const (
+	t1 = "01/02/2006"
+	t2 = "1/02/2006"
+	t3 = "01/2/2006"
+	t4 = "1/1/2006"
+)
+
+func formatDate(d string) time.Time {
+	var date time.Time
+	var err error
+	date, err = time.Parse(t1, d)
 	if err != nil {
-		log.Fatal(err)
+		date, err = time.Parse(t2, d)
+
+		if err != nil {
+			date, err = time.Parse(t3, d)
+
+			if err != nil {
+				date, err = time.Parse(t4, d)
+			}
+		}
 	}
-	info, err := os.Stat(path.Join(usr.HomeDir, "rowing.json"))
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
+
+	return date
 }
 
 type Events struct {
@@ -43,9 +56,70 @@ type Row struct {
 	Date     string  `json:"date"`
 	Distance int     `json:"distance"`
 	Duration float64 `json:"duration"`
+	Actual   float64 `json:"actual"`
 	Pace     float64 `json:"pace"`
 	Power    int     `json:"power"`
 	Notes    string  `json:"notes"`
+}
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func bootstrap() *sql.DB {
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	folder := usr.HomeDir
+	file := ".rowing.db"
+	database := folder + "/" + file
+	needTable := false
+
+	if _, err := os.Stat(database); os.IsNotExist(err) {
+		f, err := os.Create(database) // Create SQLite file
+		check(err)
+
+		err = f.Close()
+		check(err)
+
+		fmt.Printf("file: %s created\n", database)
+		needTable = true
+	}
+
+	db, _ := sql.Open("sqlite3", database)
+	if needTable == true {
+		createTable(db)
+	}
+	return db
+}
+
+func createTable(db *sql.DB) {
+	createTableSql := `CREATE TABLE rowing (
+		"id" INTEGER PRIMARY KEY AUTOINCREMENT,
+		"date" TEXT,
+		"distance" INTEGER,
+		"duration" INTEGER,
+		"actual" INTEGER,
+		"pace" INTEGER,
+		"power" INTEGER
+	);`
+
+	log.Println("Create rowing table...")
+	statement, err := db.Prepare(createTableSql) // Prepare SQL Statement
+	check(err)
+
+	_, err = statement.Exec()
+	check(err)
+
+	log.Println("rowing table created")
+}
+
+func writeEntry() {
+
 }
 
 func main() {
@@ -53,6 +127,7 @@ func main() {
 	var distance int
 	var power int
 	var duration string
+	var actual string
 	var pace string
 	power, notes := 4, ""
 
@@ -88,6 +163,13 @@ func main() {
 				Required:    true,
 				Destination: &duration,
 			},
+			&cli.StringFlag{
+				Name:        "actual",
+				Usage:       "Actual time spent rowing",
+				Aliases:     []string{"a"},
+				Required:    true,
+				Destination: &actual,
+			},
 			&cli.IntFlag{
 				Name:        "power",
 				Usage:       "Power setting on rower",
@@ -96,16 +178,15 @@ func main() {
 				Destination: &power,
 				Value:       4,
 			},
-			&cli.StringFlag{
-				Name:        "notes",
-				Usage:       "Notes for rowing event",
-				Aliases:     []string{"n"},
-				Required:    false,
-				Destination: &notes,
-				Value:       "",
-			},
 		},
 		Action: func(c *cli.Context) error {
+
+			var dSec float64
+			var aSec float64
+			var pSec float64
+
+			db := bootstrap()
+
 			// add entry to bottom of the file
 			fmt.Printf("Distance: %x, Pace: %s, Date: %s\n", distance, pace, date)
 
@@ -117,44 +198,42 @@ func main() {
 				zeroFmt = "00:00:00"
 			}
 
-			dSec := toSeconds(duration, timeFmt, zeroFmt)
-			pSec := toSeconds(pace, "4:05.0", "0:00.0")
+			dSec = toSeconds(duration, timeFmt, zeroFmt)
+			if len(actual) > 0 {
+				aSec = toSeconds(actual, timeFmt, zeroFmt)
+			} else {
+				aSec = dSec
+			}
+
+			// olive my love
+
+			pSec = toSeconds(pace, "4:05.0", "0:00.0")
 
 			fmt.Println("duration: lSec:", dSec)
 			fmt.Println("duration: pSec:", pSec)
+			fmt.Println("duration: aSec:", aSec)
 
-			usr, err := user.Current()
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			jsonFile, _ := os.Open(path.Join(usr.HomeDir, "rowing-new.json"))
-			defer jsonFile.Close()
-			byteValue, _ := ioutil.ReadAll(jsonFile)
-
-			var events []Row
-			json.Unmarshal(byteValue, &events)
 
 			event := Row{
 				Date:     date,
 				Distance: distance,
 				Duration: dSec,
+				Actual:   aSec,
 				Pace:     pSec,
 				Power:    power,
 				Notes:    notes,
 			}
 
-			events = append(events, event)
 
-			// fmt.Println(event)
-			// t, _ := time.Parse("2006-01-02", date)
-			// fmt.Println(t)
-			// for i := 0; i < len(events); i++ {
-			// 	fmt.Printf("date: %s, distance: %d, duration: %.0f, pace: %.1f\n", events[i].Date, events[i].Distance, events[i].Duration, events[i].Pace)
-			// }
+			fmt.Printf("date: %s, distance: %d, duration: %.0f, actual: %.0f, pace: %.1f\n", event.Date, event.Distance, event.Duration, event.Actual, event.Pace)
 
-			file, _ := json.MarshalIndent(events, "", " ")
-			_ = ioutil.WriteFile(path.Join(usr.HomeDir, "rowing-new.json"), file, 0644)
+
+			insertSql := "INSERT INTO rowing(date, distance, duration, actual, pace, power) VALUES (?, ?, ?, ?, ?, ?)"
+			stmt, err := db.Prepare(insertSql)
+			check(err)
+
+			_, err = stmt.Exec(event.Date, event.Distance, event.Duration, event.Actual, event.Pace, 4)
+			check(err)
 
 			return nil
 		},
