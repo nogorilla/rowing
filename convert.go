@@ -10,65 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 )
-
-func toSecs(t string, format string, base string) float64 {
-	duration, _ := time.Parse(format, t)
-	zero, _ := time.Parse(format, base)
-
-	result, _ := time.ParseDuration(duration.Sub(zero).String())
-
-	return result.Seconds()
-}
-
-type Events struct {
-	Events []Row `json:"events"`
-}
-
-type Row struct {
-	Date     string `json:"date"`
-	Distance string `json:"distance"`
-	Duration string `json:"duration"`
-	Pace     string `json:"pace"`
-	Power    int    `json:"power"`
-	Notes    string `json:"notes"`
-}
-
-type RowNew struct {
-	Date     time.Time `json:"date"`
-	Distance int       `json:"distance"`
-	Duration float64   `json:"duration"`
-	Pace     float64   `json:"pace"`
-	Power    int       `json:"power"`
-	Notes    string    `json:"notes"`
-}
-
-const (
-	t1 = "01/02/2006"
-	t2 = "1/02/2006"
-	t3 = "01/2/2006"
-	t4 = "1/1/2006"
-)
-
-func formatDate(d string) time.Time {
-	var date time.Time
-	var err error
-	date, err = time.Parse(t1, d)
-	if err != nil {
-		date, err = time.Parse(t2, d)
-
-		if err != nil {
-			date, err = time.Parse(t3, d)
-
-			if err != nil {
-				date, err = time.Parse(t4, d)
-			}
-		}
-	}
-
-	return date
-}
 
 func main() {
 
@@ -83,7 +25,7 @@ func main() {
 	jsonFile, _ := os.Open(path.Join(usr.HomeDir, "rowing.json"))
 	defer jsonFile.Close()
 	byteValue, _ := ioutil.ReadAll(jsonFile)
-	var events []Row
+	var events []RowJson
 	json.Unmarshal(byteValue, &events)
 
 	var eventsNew []RowNew
@@ -91,7 +33,7 @@ func main() {
 	for i := 0; i < len(events); i++ {
 		date := formatDate(events[i].Date)
 		// fmt.Println(date)
-		distance, _ := strconv.Atoi(strings.Replace(events[i].Distance, ",", "", -1))
+		distance, _ := strconv.Atoi(strings.Replace(strings.Replace(events[i].Distance, ",", "", -1), ".00", "", -1))
 		d := events[i].Duration
 		p := events[i].Pace
 		power := events[i].Power
@@ -104,9 +46,9 @@ func main() {
 
 		var pSec float64
 
-		dSec := toSecs(d, timeFmt, zeroFmt)
+		dSec := toSeconds(d, timeFmt, zeroFmt)
 		if len(p) > 0 {
-			pSec = toSecs(p, "4:05.0", "0:00.0")
+			pSec = toSeconds(p, "4:05.0", "0:00.0")
 		} else {
 			pSec = 0.0
 		}
@@ -117,7 +59,10 @@ func main() {
 		eventsNew = append(eventsNew, r)
 	}
 
-	fmt.Println(eventsNew)
+	for i := 0; i < len(events); i++ {
+		fmt.Println(events[i])
+		//fmt.Printf("date: %s, distance: %d, duration: %.0f, pace: %.1f\n", events[i].Date, events[i].Distance, events[i].Duration, events[i].Pace)
+	}
 
 	file, _ := json.MarshalIndent(eventsNew, "", " ")
 	_ = ioutil.WriteFile(path.Join(usr.HomeDir, "rowing-new.json"), file, 0644)
