@@ -102,7 +102,6 @@ func main() {
 			fmt.Println("duration: pSec:", pSec)
 			fmt.Println("duration: aSec:", aSec)
 
-
 			event := Row{
 				Date:     date,
 				Distance: distance,
@@ -113,9 +112,7 @@ func main() {
 				Notes:    notes,
 			}
 
-
 			fmt.Printf("date: %s, distance: %d, duration: %.0f, actual: %.0f, pace: %.1f\n", event.Date, event.Distance, event.Duration, event.Actual, event.Pace)
-
 
 			insertSql := "INSERT INTO rowing(date, distance, duration, actual, pace, power) VALUES (?, ?, ?, ?, ?, ?)"
 			stmt, err := db.Prepare(insertSql)

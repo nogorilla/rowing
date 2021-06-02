@@ -1,4 +1,4 @@
-package main
+package structs
 
 import "time"
 
@@ -21,7 +21,6 @@ type RowNew struct {
 	Power    int       `json:"power"`
 	Notes    string    `json:"notes"`
 }
-
 
 type RowJson struct {
 	Date     string `json:"date"`

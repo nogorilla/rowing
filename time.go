@@ -1,4 +1,4 @@
-package main
+package time
 
 import "time"
 
@@ -8,7 +8,6 @@ const (
 	t3 = "01/2/2006"
 	t4 = "1/1/2006"
 )
-
 
 func toSeconds(t string, format string, base string) float64 {
 	duration, _ := time.Parse(format, t)
