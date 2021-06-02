@@ -8,6 +8,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/nogorilla/rowing/row"
 	"github.com/urfave/cli/v2"
 )
 
