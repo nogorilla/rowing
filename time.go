@@ -1,4 +1,4 @@
-package row
+package time
 
 import "time"
 

@@ -1,4 +1,4 @@
-package row
+package db
 
 import (
 	"database/sql"
